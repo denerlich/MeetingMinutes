@@ -1,48 +1,50 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox
+import streamlit as st
 from bs4 import BeautifulSoup
 import pandas as pd
-import os
+import io
 
-def parse_transcript(html_file):
-    with open(html_file, "r", encoding='utf-8') as file:
-        soup = BeautifulSoup(file, "html.parser")
+# Function to parse transcript
+def parse_transcript(html_content):
+    soup = BeautifulSoup(html_content, "html.parser")
 
     entries = []
     for entry in soup.find_all('div', class_='baseEntry-443'):
         speaker_tag = entry.find_previous('span', class_='itemDisplayName-456')
         timestamp_tag = entry.find('span', class_='screenReaderFriendlyHiddenTag-397')
         text_tag = entry.find('div', class_='entryText-444')
-        
+
         speaker = speaker_tag.get_text(strip=True) if speaker_tag else 'Unknown'
         timestamp = timestamp_tag.get_text(strip=True) if timestamp_tag else ""
         text = text_tag.get_text(strip=True) if text_tag else ""
 
-        yield {"Speaker": speaker, "Timestamp": timestamp, "Text": text_tag.get_text(strip=True)}
+        entries.append({"Speaker": speaker, "Timestamp": timestamp, "Text": text})
 
-    
-def process_file():
-    file_path = filedialog.askopenfilename(filetypes=[("HTML files", "*.html;*.htm;*.txt")])
-    if file_path:
-        try:
-            transcript_data = list(parse_transcript(file_path))
-            df = pd.DataFrame(transcript_data)
-            output_path = os.path.splitext(file_path)[0] + '_transcript.xlsx'
-            transcript_df = pd.DataFrame(transcript_data)
+    return pd.DataFrame(entries)
 
-            # Additional analysis can be added here, such as NLP tasks for sentiment analysis, mentioned documents, etc.
-            transcript_data_df = pd.DataFrame(transcript_data)
-            transcript_data_df.to_excel(output_filename := file_path.replace('.html', '_transcript.xlsx').replace('.txt', '_transcript.xlsx'), index=False)
-            messagebox.showinfo("Success", f"Transcript extracted successfully and saved as {output_filename}")
+# Streamlit app UI
+st.title("📄 HTML Transcript Analyzer")
 
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to process the file: {e}")
+uploaded_file = st.file_uploader("Choose your HTML or TXT transcript file", type=["html", "htm", "txt"])
 
-root = tk.Tk()
-root.title("HTML Transcript Extractor")
-root.geometry("300x100")
+if uploaded_file:
+    try:
+        html_content = uploaded_file.getvalue().decode('utf-8')
+        transcript_df = parse_transcript(html_content)
 
-btn = tk.Button(root, text="Select HTML Transcript", command=process_file)
-btn.pack(expand=True)
+        st.subheader("📋 Transcript Preview")
+        st.dataframe(transcript_df.head(50))
 
-root.mainloop()
+        # Download button for extracted transcript as Excel
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            transcript_df.to_excel(writer, index=False, sheet_name='Transcript')
+
+        st.download_button(
+            label="📥 Download Transcript as Excel",
+            data=buffer.getvalue(),
+            file_name="transcript_output.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
