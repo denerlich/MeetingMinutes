@@ -3,15 +3,15 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import io
 
-# Function to parse transcript robustly
+# Function to parse transcript robustly with correct HTML classes
 def parse_transcript(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
     entries = []
 
-    for entry in soup.find_all('div', role='listitem'):
-        speaker_tag = entry.find('span', class_=lambda c: c and c.startswith('itemDisplayName'))
-        timestamp_tag = entry.find('span', class_=lambda c: c and c.startswith('screenReaderFriendlyHiddenTag'))
-        text_tag = entry.find('div', class_=lambda c: c and c.startswith('entryText'))
+    for entry in soup.find_all('div', class_='baseEntry-443'):
+        speaker_tag = entry.find_previous('div', class_='speakerProfile-406')
+        timestamp_tag = entry.find('span', class_='baseTimestamp-452')
+        text_tag = entry.find('div', class_='entryText-444')
 
         speaker = speaker_tag.get_text(strip=True) if speaker_tag else "Unknown"
         timestamp = timestamp_tag.get_text(strip=True) if timestamp_tag else ""
