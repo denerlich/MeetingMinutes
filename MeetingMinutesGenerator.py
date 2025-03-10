@@ -2,20 +2,27 @@ import streamlit as st
 from bs4 import BeautifulSoup
 import pandas as pd
 import io
+import re
 
-# Function to parse transcript correctly
+# Function to parse transcript robustly with expanded coverage
 def parse_transcript(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
     entries = []
 
-    for entry in soup.find_all('div', class_='baseEntry-406'):  # Updated class based on HTML structure
-        speaker_tag = entry.find_previous('span', class_='itemDisplayName-419')  # Corrected speaker class
-        timestamp_tag = entry.find('span', class_='screenReaderFriendlyHiddenTag-360')  # Corrected timestamp class
-        text_tag = entry.find('div', class_='entryText-407')  # Corrected text class
+    for entry in soup.find_all('div', class_='baseEntry-406'):
+        speaker_tag = entry.find_previous('span', class_='itemDisplayName-419')
+        timestamp_tag = entry.find('span', class_=['screenReaderFriendlyHiddenTag-360', 'baseTimestamp-415'])
+        text_tag = entry.find('div', class_=['entryText-407', 'eventText-414'])
 
         speaker = speaker_tag.get_text(strip=True) if speaker_tag else "Unknown"
         timestamp = timestamp_tag.get_text(strip=True) if timestamp_tag else ""
         text = text_tag.get_text(strip=True) if text_tag else ""
+
+        # Ensure we capture alternative timestamps
+        if not timestamp:
+            timestamp_search = re.search(r"\d+\sminutes?\s\d+\sseconds?", entry.get_text())
+            if timestamp_search:
+                timestamp = timestamp_search.group(0)
 
         entries.append({
             "Speaker": speaker,
@@ -26,7 +33,7 @@ def parse_transcript(html_content):
     return pd.DataFrame(entries)
 
 # Streamlit app UI
-st.title("📄 HTML Transcript Analyzer")
+st.title("📄 HTML Transcript Analyzer - Enhanced")
 
 uploaded_file = st.file_uploader("Choose your HTML or TXT transcript file", type=["html", "htm", "txt"])
 
