@@ -4,36 +4,42 @@ import pandas as pd
 import io
 import re
 
-# Function to parse transcript robustly with expanded coverage
+# Function to parse transcript with enhanced heuristics
 def parse_transcript(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
     entries = []
 
-    for entry in soup.find_all('div', class_='baseEntry-406'):
-        speaker_tag = entry.find_previous('span', class_='itemDisplayName-419')
-        timestamp_tag = entry.find('span', class_=['screenReaderFriendlyHiddenTag-360', 'baseTimestamp-415'])
-        text_tag = entry.find('div', class_=['entryText-407', 'eventText-414'])
-
+    for entry in soup.find_all("div", class_=["baseEntry-406", "eventText-414", "entryText-407"]):
+        # Identify speaker
+        speaker_tag = entry.find_previous("div", class_=["speakerProfile-369"])
         speaker = speaker_tag.get_text(strip=True) if speaker_tag else "Unknown"
-        timestamp = timestamp_tag.get_text(strip=True) if timestamp_tag else ""
-        text = text_tag.get_text(strip=True) if text_tag else ""
 
-        # Ensure we capture alternative timestamps
+        # Identify timestamp
+        timestamp_tag = entry.find("span", class_=["screenReaderFriendlyHiddenTag-360", "baseTimestamp-415"])
+        timestamp = timestamp_tag.get_text(strip=True) if timestamp_tag else ""
         if not timestamp:
             timestamp_search = re.search(r"\d+\sminutes?\s\d+\sseconds?", entry.get_text())
             if timestamp_search:
                 timestamp = timestamp_search.group(0)
+
+        # Identify text content
+        text_tag = entry.find("div", class_=["entryText-407", "eventText-414", "currentEntryText-408"])
+        text = text_tag.get_text(strip=True) if text_tag else ""
+
+        # Filter out metadata lines
+        if "started transcription" in text.lower():
+            continue
 
         entries.append({
             "Speaker": speaker,
             "Timestamp": timestamp,
             "Text": text
         })
-
+    
     return pd.DataFrame(entries)
 
 # Streamlit app UI
-st.title("📄 HTML Transcript Analyzer - Enhanced")
+st.title("📄 HTML Transcript Analyzer - Fully Optimized")
 
 uploaded_file = st.file_uploader("Choose your HTML or TXT transcript file", type=["html", "htm", "txt"])
 
@@ -59,6 +65,6 @@ if uploaded_file:
                 file_name="transcript_output.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-
+    
     except Exception as e:
         st.error(f"An error occurred: {e}")
